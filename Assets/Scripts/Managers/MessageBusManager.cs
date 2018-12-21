@@ -1,6 +1,7 @@
 ﻿using NATS.Client;
 using NATSTesting.Core;
 using System;
+using System.Collections;
 using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
@@ -15,7 +16,10 @@ namespace NATSTesting.Managers
         private Options connectionOptions;
         private IConnection connection;
 
-        void Awake()
+        private bool receivingMessage;
+        private string message;
+
+        void Start()
         {
             SetupMessageBus();
         }
@@ -26,6 +30,14 @@ namespace NATSTesting.Managers
             connectionOptions = ConnectionFactory.GetDefaultOptions();
             connectionOptions.Url = defaultNATSUrl;
             connectionOptions.Secure = false;
+        }
+
+        private void Update()
+        {
+            if (receivingMessage) {
+                messages.text = message;
+                receivingMessage = false;
+            }
         }
 
         private bool OpenConnection()
@@ -55,15 +67,11 @@ namespace NATSTesting.Managers
         {
             if (OpenConnection())
             {
-                // Setup an event handler to process incoming messages.
-                // An anonymous delegate function is used for brevity.
-                EventHandler<MsgHandlerEventArgs> messageHandler = (sender, args) =>
-                {
+                IAsyncSubscription subscriber = connection.SubscribeAsync("PinBallGroup", (sender, args) => {
                     Debug.Log(args.Message);
-                    messages.text = $"Subject: {args.Message.Subject} | PayLoad: {Encoding.UTF8.GetString(args.Message.Data)}";
-                };
-
-                IAsyncSubscription subscriber = connection.SubscribeAsync("PinBallGroup", messageHandler);
+                    message = $"Subject: {args.Message.Subject} | PayLoad: {Encoding.UTF8.GetString(args.Message.Data)}";
+                    receivingMessage = true;
+                });
                 connection.Publish("PinBallGroup", Encoding.UTF8.GetBytes("Let us bring pinball back"));
             }
         }
@@ -71,6 +79,7 @@ namespace NATSTesting.Managers
         void OnApplicationQuit()
         {
             CloseConnection();
+            messages.text = string.Empty;
         }
     }
 
